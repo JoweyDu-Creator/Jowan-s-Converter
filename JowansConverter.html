@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jowan's Converter | Success Protocol</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            overflow: hidden; display: flex; justify-content: center; align-items: center;
+            background: #050508; font-family: 'Segoe UI', sans-serif; 
+        }
+
+        .background-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://thumbs.dreamstime.com/b/rainy-day-comfort-cozy-desk-tea-book-lofi-ambiance-study-scene-wooden-front-window-showing-rain-outside-423211682.jpg?w=768') no-repeat center center;
+            background-size: cover; z-index: 1; filter: brightness(0.3);
+        }
+
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0) 20%, rgba(0,0,0,0.9) 100%); z-index: 2;
+        }
+
+        .main-wrapper {
+            position: relative; background: rgba(20, 20, 32, 0.97);
+            backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+            padding: 30px; border-radius: 40px;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.9);
+            border: 1px solid rgba(162, 155, 254, 0.15);
+            width: 500px; text-align: center; color: white; z-index: 10;
+            transition: all 0.5s ease;
+        }
+
+        .brand-sign { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 5px; color: #a29bfe; font-weight: 900; display: block; }
+        .gemini-credit { font-size: 0.6rem; color: rgba(162, 155, 254, 0.4); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; display: block; }
+
+        /* PREVIEW AREA */
+        .preview-window {
+            width: 100%; height: 200px; border-radius: 25px;
+            background: #08080c; border: 1px solid rgba(162, 155, 254, 0.2);
+            margin-bottom: 20px; overflow: hidden; display: flex;
+            justify-content: center; align-items: center; position: relative;
+            cursor: zoom-in;
+        }
+        .preview-canvas-area {
+            position: relative; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; align-items: center; justify-content: center;
+            max-width: 95%; max-height: 95%; border: 1px solid #6c5ce7;
+        }
+        #live-preview { width: 100%; height: 100%; object-fit: contain; transition: transform 0.2s; }
+
+        /* INPUTS & GRID */
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left; }
+        .field-group { display: flex; flex-direction: column; gap: 5px; position: relative; }
+        .field-group label { font-size: 0.65rem; font-weight: 800; color: #a29bfe; text-transform: uppercase; margin-left: 10px; }
+
+        .input-box { background: #151525; border-radius: 18px; border: 1px solid rgba(162, 155, 254, 0.2); position: relative; overflow: hidden; }
+        input {
+            background: transparent; color: #fff; border: none; padding: 12px 15px;
+            width: 100%; outline: none; font-weight: 600; font-size: 0.85rem; appearance: none;
+        }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+
+        .btn-stack { position: absolute; right: 0; top: 0; bottom: 0; width: 30px; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); }
+        .s-btn { flex: 1; display: flex; align-items: center; justify-content: center; color: #a29bfe; cursor: pointer; font-size: 0.5rem; }
+        .s-btn:hover { background: #6c5ce7; color: white; }
+
+        /* CUSTOM DROPDOWN */
+        .dropdown { background: #151525; border-radius: 18px; padding: 12px 15px; border: 1px solid rgba(162, 155, 254, 0.2); cursor: pointer; font-size: 0.85rem; position: relative; font-weight: 600; }
+        .dropdown::after { content: '▾'; position: absolute; right: 12px; color: #a29bfe; }
+        .drop-list { position: absolute; top: 110%; left: 0; width: 100%; background: #1c1c30; border-radius: 15px; border: 1px solid #6c5ce7; display: none; flex-direction: column; z-index: 100; }
+        .drop-item { padding: 10px 15px; font-size: 0.8rem; transition: 0.2s; }
+        .drop-item:hover { background: #6c5ce7; }
+
+        /* BUTTONS */
+        button.main-btn { 
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; border: none; 
+            padding: 18px; width: 100%; border-radius: 20px; cursor: pointer;
+            font-size: 1rem; font-weight: 800; transition: 0.3s; margin-top: 20px;
+        }
+        button.main-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(108, 92, 231, 0.4); }
+
+        /* LOADING & SUCCESS STATES */
+        .loader-bar-wrap { width: 100%; background: rgba(255,255,255,0.05); height: 8px; border-radius: 10px; margin: 20px 0; overflow: hidden; }
+        .loader-fill { height: 100%; width: 0%; background: #00ff88; box-shadow: 0 0 15px #00ff88; transition: width 0.2s; }
+
+        #success-state { display: none; }
+        .success-icon { font-size: 4rem; color: #00ff88; text-shadow: 0 0 30px rgba(0, 255, 136, 0.5); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+        #file-upload { display: none; }
+        #refine, #loading, #success-state { display: none; }
+        .upload-zone { border: 2px dashed rgba(162, 155, 254, 0.2); padding: 50px; border-radius: 30px; cursor: pointer; display: block; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="background-layer"></div>
+    <div class="overlay"></div>
+
+    <div class="main-wrapper" id="main">
+        <span class="brand-sign">JOWAN'S CONVERTER</span>
+        <span class="gemini-credit">By Gemini</span>
+        <label class="upload-zone" for="file-upload">
+            <span style="opacity: 0.5; font-size: 0.8rem; font-weight: bold;">CLICK TO UPLOAD IMAGE</span>
+            <input type="file" id="file-upload" accept="image/*">
+        </label>
+    </div>
+
+    <div class="main-wrapper" id="refine">
+        <span class="brand-sign">CUSTOMIZE OUTPUT</span>
+        <span class="gemini-credit">By Gemini</span>
+        
+        <div class="preview-window" id="zoom-box">
+            <div class="preview-canvas-area" id="frame">
+                <img id="live-preview" src="">
+            </div>
+        </div>
+
+        <div class="settings-grid">
+            <div class="field-group">
+                <label>Format</label>
+                <div class="dropdown" id="f-sel" onclick="toggle('f-list')">PDF Document</div>
+                <div class="drop-list" id="f-list">
+                    <div class="drop-item" onclick="setV('fmt', 'pdf', 'PDF Document')">PDF Document</div>
+                    <div class="drop-item" onclick="setV('fmt', 'png', 'PNG Image')">PNG Image</div>
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Quality</label>
+                <div class="dropdown" id="q-sel" onclick="toggle('q-list')">High (Original)</div>
+                <div class="drop-list" id="q-list">
+                    <div class="drop-item" onclick="setV('q', '1.0', 'High (Original)')">High (Original)</div>
+                    <div class="drop-item" onclick="setV('q', '0.7', 'Balanced')">Balanced</div>
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Width (px)</label>
+                <div class="input-box">
+                    <input type="number" id="w" placeholder="Auto" oninput="rescale()">
+                    <div class="btn-stack">
+                        <div class="s-btn" onclick="adj('w', 100)">▲</div>
+                        <div class="s-btn" onclick="adj('h', -100)">▼</div>
+                    </div>
+                </div>
+            </div>
+            <div class="field-group">
+                <label>Height (px)</label>
+                <div class="input-box">
+                    <input type="number" id="h" placeholder="Auto" oninput="rescale()">
+                    <div class="btn-stack">
+                        <div class="s-btn" onclick="adj('h', 100)">▲</div>
+                        <div class="s-btn" onclick="adj('h', -100)">▼</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="main-btn" onclick="startProcess()">Convert & Save</button>
+    </div>
+
+    <div class="main-wrapper" id="loading">
+        <span class="brand-sign" style="color: #00ff88;">SYSTEM OPTIMIZING</span>
+        <h2 style="margin-bottom: 5px;">Processing...</h2>
+        <div class="loader-bar-wrap">
+            <div class="loader-fill" id="l-fill"></div>
+        </div>
+    </div>
+
+    <div class="main-wrapper" id="success-state" style="border-color: #00ff88;">
+        <div class="success-icon">✔</div>
+        <h2 style="color: #00ff88; margin-top: 10px;">SUCCESS!</h2>
+        <p style="opacity: 0.7;">Your file has been generated.</p>
+        <div style="margin-top: 20px; font-size: 0.8rem; font-weight: 900;">
+            RETURNING HOME IN <span id="count" style="color: #00ff88;">5</span>...
+        </div>
+    </div>
+
+<script>
+    const input = document.getElementById('file-upload');
+    const previewImg = document.getElementById('live-preview');
+    const frame = document.getElementById('frame');
+    let baseImg = new Image();
+    let opt = { fmt: 'pdf', q: '1.0' };
+
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            baseImg.src = ev.target.result;
+            baseImg.onload = () => {
+                previewImg.src = baseImg.src;
+                document.getElementById('main').style.display = 'none';
+                document.getElementById('refine').style.display = 'block';
+                rescale();
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    function rescale() {
+        const tw = parseInt(document.getElementById('w').value) || baseImg.width;
+        const th = parseInt(document.getElementById('h').value) || baseImg.height;
+        const aspect = tw / th;
+        if (aspect > 1) {
+            frame.style.width = "90%";
+            frame.style.height = (90 / aspect) + "%";
+        } else {
+            frame.style.height = "90%";
+            frame.style.width = (90 * aspect) + "%";
+        }
+    }
+
+    function toggle(id) {
+        const list = document.getElementById(id);
+        const open = list.style.display === 'flex';
+        document.querySelectorAll('.drop-list').forEach(l => l.style.display = 'none');
+        list.style.display = open ? 'none' : 'flex';
+    }
+
+    function setV(k, v, l) {
+        opt[k] = v;
+        document.getElementById(k.charAt(0) + '-sel').innerText = l;
+    }
+
+    function adj(id, d) {
+        const el = document.getElementById(id);
+        const v = parseInt(el.value) || (id === 'w' ? baseImg.width : baseImg.height);
+        el.value = Math.max(10, v + d);
+        rescale();
+    }
+
+    // Zoom-on-hover logic
+    document.getElementById('zoom-box').onmousemove = (e) => {
+        const { left, top, width, height } = previewImg.getBoundingClientRect();
+        const x = ((e.pageX - left) / width) * 100;
+        const y = ((e.pageY - top) / height) * 100;
+        previewImg.style.transformOrigin = `${x}% ${y}%`;
+        previewImg.style.transform = "scale(2)";
+    };
+    document.getElementById('zoom-box').onmouseleave = () => { previewImg.style.transform = "scale(1)"; };
+
+    function startProcess() {
+        document.getElementById('refine').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
+        
+        let progress = 0;
+        const fill = document.getElementById('l-fill');
+        const interval = setInterval(() => {
+            progress += Math.random() * 15;
+            if(progress > 100) progress = 100;
+            fill.style.width = progress + "%";
+            
+            if(progress === 100) {
+                clearInterval(interval);
+                finalize();
+            }
+        }, 150);
+    }
+
+    function finalize() {
+        const canvas = document.createElement('canvas');
+        const tw = parseInt(document.getElementById('w').value) || baseImg.width;
+        const th = parseInt(document.getElementById('h').value) || baseImg.height;
+        canvas.width = tw; canvas.height = th;
+        canvas.getContext('2d').drawImage(baseImg, 0, 0, tw, th);
+
+        if(opt.fmt === 'pdf') {
+            const doc = new jspdf.jsPDF({ orientation: tw > th ? 'l' : 'p', unit: 'px', format: [tw, th] });
+            doc.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, tw, th);
+            doc.save("Gemini-Result.pdf");
+        } else {
+            const a = document.createElement('a');
+            a.download = `Gemini-Result.${opt.fmt}`;
+            a.href = canvas.toDataURL(`image/${opt.fmt}`, 1.0);
+            a.click();
+        }
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('success-state').style.display = 'block';
+        
+        let timeLeft = 5;
+        const countdown = setInterval(() => {
+            timeLeft--;
+            document.getElementById('count').innerText = timeLeft;
+            if(timeLeft === 0) {
+                clearInterval(countdown);
+                location.reload();
+            }
+        }, 1000);
+    }
+</script>
+</body>
+</html>
